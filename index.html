@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resume Picker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; height: 100vh; overflow: hidden; }
+  .layout { display: flex; height: 100vh; }
+
+  .panel-left { width: 460px; min-width: 400px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #2a2a2a; position: relative; }
+  .panel-header { padding: 0.6rem 1.2rem 0.2rem 90px; -webkit-app-region: drag; }
+  .panel-header h1 { -webkit-app-region: no-drag; font-size: 1.3rem; font-weight: 600; color: #fff; }
+  .project-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 1.2rem 0.6rem 90px; font-size: 0.78rem; color: #888; }
+  .project-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .project-bar button { border: none; background: #2a2a2a; color: #ccc; padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.75rem; cursor: pointer; }
+  .project-bar button:hover { background: #3a3a3a; }
+
+  .tab-bar { display: flex; gap: 0; padding: 0 1.2rem; border-bottom: 1px solid #2a2a2a; }
+  .tab { padding: 0.5rem 1rem; font-size: 0.85rem; color: #777; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
+  .tab:hover { color: #bbb; }
+  .tab.active { color: #4ade80; border-bottom-color: #4ade80; }
+  .panel-body { flex: 1; overflow-y: auto; padding: 0.75rem 1.2rem 1rem; }
+
+  .panel-right { flex: 1; display: flex; flex-direction: column; background: #1a1a1a; }
+  .preview-header { padding: 0.75rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a2a2a; -webkit-app-region: drag; }
+  .preview-header span { font-size: 0.9rem; color: #888; }
+  .preview-body { flex: 1; position: relative; }
+  .preview-body iframe { width: 100%; height: 100%; border: none; background: #333; }
+  .preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 1rem; }
+
+  .section { background: #1a1a1a; border-radius: 10px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; border: 1px solid #2a2a2a; }
+  .section-header { display: flex; align-items: center; gap: 0.6rem; }
+  .section-header h2 { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #bbb; }
+  .items { padding-left: 0.25rem; margin-top: 0.3rem; }
+
+  .item { border-radius: 6px; transition: background 0.15s; margin-bottom: 2px; }
+  .item-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0.4rem; cursor: pointer; }
+  .item-row:hover { background: #252525; border-radius: 6px; }
+  .item-title { font-size: 0.85rem; flex: 1; line-height: 1.3; }
+  .item-title.disabled { color: #555; text-decoration: line-through; }
+  .expand-arrow { font-size: 0.7rem; color: #555; transition: transform 0.2s; user-select: none; width: 16px; text-align: center; }
+  .expand-arrow.open { transform: rotate(90deg); }
+  .expand-arrow.hidden { visibility: hidden; }
+
+  .bullet-list { padding: 0.2rem 0 0.3rem 2.8rem; display: none; }
+  .bullet-list.open { display: block; }
+  .bullet { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.25rem 0.3rem; border-radius: 5px; margin-bottom: 2px; }
+  .bullet:hover { background: #1f1f1f; }
+  .bullet-text { font-size: 0.8rem; color: #aaa; line-height: 1.4; flex: 1; cursor: text; }
+  .bullet-text.disabled { color: #555; text-decoration: line-through; }
+  .bullet-text:focus { outline: none; color: #ddd; text-decoration: none; }
+  .bullet-text[contenteditable] { border-bottom: 1px solid transparent; }
+  .bullet-text[contenteditable]:focus { border-bottom-color: #4ade80; }
+
+  .toggle-sm { position: relative; width: 30px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+  .toggle-sm input { opacity: 0; width: 0; height: 0; }
+  .toggle-sm .slider { position: absolute; cursor: pointer; inset: 0; background: #333; border-radius: 16px; transition: 0.2s; }
+  .toggle-sm .slider::before { content: ''; position: absolute; height: 10px; width: 10px; left: 3px; bottom: 3px; background: #888; border-radius: 50%; transition: 0.2s; }
+  .toggle-sm input:checked + .slider { background: #4ade80; }
+  .toggle-sm input:checked + .slider::before { transform: translateX(14px); background: #fff; }
+  .toggle-sm input:disabled + .slider { opacity: 0.3; cursor: default; }
+
+  .toggle { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #333; border-radius: 20px; transition: 0.2s; }
+  .toggle .slider::before { content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #888; border-radius: 50%; transition: 0.2s; }
+  .toggle input:checked + .slider { background: #4ade80; }
+  .toggle input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+  .toggle input:disabled + .slider { opacity: 0.4; cursor: default; }
+
+  .actions { padding: 0.75rem 1.2rem; border-top: 1px solid #2a2a2a; display: flex; gap: 0.5rem; }
+  .btn { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; flex: 1; }
+  .btn-primary { background: #4ade80; color: #000; }
+  .btn-primary:hover { background: #22c55e; }
+  .btn-secondary { background: #2a2a2a; color: #ccc; border: 1px solid #3a3a3a; }
+  .btn-secondary:hover { background: #333; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .status { padding: 0 1.2rem 0.5rem; font-size: 0.8rem; color: #666; min-height: 1.2rem; }
+  .status.ok { color: #4ade80; }
+  .status.err { color: #f87171; }
+
+  .config-group { margin-bottom: 1rem; }
+  .config-group h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 0.5rem; }
+  .config-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.3rem 0; }
+  .config-label { font-size: 0.85rem; color: #aaa; width: 130px; flex-shrink: 0; }
+  .config-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: #333; border-radius: 2px; outline: none; }
+  .config-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: #4ade80; border-radius: 50%; cursor: pointer; }
+  .config-value { font-size: 0.8rem; color: #888; width: 55px; text-align: right; font-variant-numeric: tabular-nums; }
+  .config-input { width: 55px; background: #222; border: 1px solid #333; color: #ccc; border-radius: 4px; padding: 2px 5px; font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .config-input:focus { border-color: #4ade80; outline: none; }
+
+  .panel-body::-webkit-scrollbar { width: 6px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+  .startup-screen { position: fixed; inset: 0; background: #0f0f0f; display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .startup-screen.hidden { display: none; }
+  .startup-card { width: 440px; max-height: 80vh; display: flex; flex-direction: column; }
+  .startup-header { text-align: center; padding-bottom: 1.5rem; -webkit-app-region: drag; padding-top: 30px; }
+  .startup-header h1 { font-size: 1.6rem; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+  .startup-header p { font-size: 0.9rem; color: #888; }
+
+  .startup-actions { display: flex; gap: 0.5rem; margin-bottom: 1.2rem; }
+  .startup-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid #2a2a2a; background: #1a1a1a; color: #ccc; font-size: 0.88rem; font-weight: 500; cursor: pointer; transition: all 0.15s; -webkit-app-region: no-drag; }
+  .startup-btn:hover { background: #252525; border-color: #3a3a3a; }
+  .startup-btn.primary { background: #4ade80; color: #000; border-color: #4ade80; font-weight: 600; }
+  .startup-btn.primary:hover { background: #22c55e; border-color: #22c55e; }
+
+  .recent-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-bottom: 0.5rem; }
+  .recent-list { flex: 1; overflow-y: auto; }
+  .recent-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 8px; cursor: pointer; transition: background 0.12s; position: relative; }
+  .recent-item:hover { background: #1a1a1a; }
+  .recent-icon { font-size: 1.3rem; flex-shrink: 0; width: 32px; height: 32px; background: #1e1e1e; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .recent-item:hover .recent-icon { background: #252525; }
+  .recent-info { flex: 1; min-width: 0; }
+  .recent-name { font-size: 0.9rem; font-weight: 500; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-path { font-size: 0.75rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-remove { opacity: 0; border: none; background: none; color: #666; font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.4rem; border-radius: 4px; flex-shrink: 0; transition: opacity 0.12s; }
+  .recent-item:hover .recent-remove { opacity: 1; }
+  .recent-remove:hover { color: #f87171; background: #2a1a1a; }
+
+  .recent-list::-webkit-scrollbar { width: 5px; }
+  .recent-list::-webkit-scrollbar-track { background: transparent; }
+  .recent-list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  .recent-empty { text-align: center; padding: 2rem 1rem; color: #444; font-size: 0.88rem; }
+</style>
+</head>
+<body>
+
+<div class="startup-screen" id="startupScreen">
+  <div class="startup-card">
+    <div class="startup-header">
+      <h1>📄 Resume Picker</h1>
+      <p>Choose a LaTeX resume project to open</p>
+    </div>
+    <div class="startup-actions">
+      <button class="startup-btn primary" id="btnOpenFolder">Open Folder…</button>
+    </div>
+    <div id="recentSection" style="display:none">
+      <div class="recent-label">Recent</div>
+      <div class="recent-list" id="recentList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="layout" id="mainLayout" style="display:none">
+  <div class="panel-left">
+    <div class="panel-header"><h1>📄 Resume Picker</h1></div>
+    <div class="project-bar">
+      <span class="project-path" id="projectPath"></span>
+      <button id="btnChangeProject">Change</button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab active" id="tabSections">Sections</div>
+      <div class="tab" id="tabLayout">Layout</div>
+    </div>
+    <div class="panel-body" id="tab-sections"></div>
+    <div class="panel-body" id="tab-layout" style="display:none"></div>
+    <div id="status" class="status"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnSave">💾 Save & Compile</button>
+      <button class="btn btn-secondary" id="btnSaveOnly">Save Only</button>
+    </div>
+  </div>
+  <div class="panel-right">
+    <div class="preview-header">
+      <span>PDF Preview</span>
+      <span id="previewStatus"></span>
+    </div>
+    <div class="preview-body">
+      <div class="preview-placeholder" id="placeholder">Click "Save & Compile" to preview</div>
+      <iframe id="pdfFrame" style="display:none"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+let data = null;
+let config = null;
+let currentPdfPath = null;
+let resumeDir = null;
+let expanded = {};
+
+const CONFIG_DEFS = [
+  { group: 'Page Margins', items: [
+    { key: 'pageTop', label: 'Top', unit: 'cm', min: 0.3, max: 3, step: 0.05 },
+    { key: 'pageBottom', label: 'Bottom', unit: 'cm', min: 0.3, max: 3, step: 0.05 },
+    { key: 'pageLeft', label: 'Left', unit: 'cm', min: 0.3, max: 3, step: 0.05 },
+    { key: 'pageRight', label: 'Right', unit: 'cm', min: 0.3, max: 3, step: 0.05 },
+  ]},
+  { group: 'Section Title Spacing', items: [
+    { key: 'sectionTop', label: 'Top space', unit: 'cm', min: 0, max: 1, step: 0.02 },
+    { key: 'sectionBottom', label: 'Bottom space', unit: 'cm', min: 0, max: 1, step: 0.02 },
+  ]},
+  { group: 'Bullet Point Spacing', items: [
+    { key: 'highlightsTopsep', label: 'Top sep', unit: 'cm', min: 0, max: 0.5, step: 0.01 },
+    { key: 'highlightsParsep', label: 'Par sep', unit: 'cm', min: 0, max: 0.5, step: 0.01 },
+  ]},
+  { group: 'Header', items: [
+    { key: 'headerFontSize', label: 'Name size', unit: 'pt', min: 10, max: 36, step: 1 },
+    { key: 'headerSepKern', label: 'Separator gap', unit: 'pt', min: 1, max: 20, step: 0.5 },
+  ]},
+];
+
+async function init() {
+  const state = await window.api.getState();
+  if (state && state.resumeDir) {
+    applyState(state);
+  } else {
+    showStartup();
+  }
+}
+
+function showStartup() {
+  document.getElementById('startupScreen').classList.remove('hidden');
+  document.getElementById('mainLayout').style.display = 'none';
+  resumeDir = null;
+  data = null;
+  config = null;
+  currentPdfPath = null;
+  loadRecentDirs();
+}
+
+async function loadRecentDirs() {
+  const dirs = await window.api.getRecentDirs();
+  const section = document.getElementById('recentSection');
+  const list = document.getElementById('recentList');
+  if (!dirs || dirs.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  list.innerHTML = '';
+  dirs.forEach((entry, i) => {
+    const row = document.createElement('div');
+    row.className = 'recent-item';
+    row.innerHTML = `
+      <div class="recent-icon">📁</div>
+      <div class="recent-info">
+        <div class="recent-name">${esc(entry.name)}</div>
+        <div class="recent-path">${esc(entry.path)}</div>
+      </div>
+      <button class="recent-remove">✕</button>
+    `;
+    row.addEventListener('click', () => openRecent(entry.path));
+    row.querySelector('.recent-remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeRecent(entry.path);
+    });
+    list.appendChild(row);
+  });
+}
+
+async function openRecent(dir) {
+  const state = await window.api.openRecentDir(dir);
+  if (state && state.error) {
+    alert(state.error);
+    loadRecentDirs();
+    return;
+  }
+  applyState(state);
+}
+
+async function removeRecent(dir) {
+  await window.api.removeRecentDir(dir);
+  loadRecentDirs();
+}
+
+function applyState(state) {
+  if (!state || !state.resumeDir) {
+    showStartup();
+    return;
+  }
+  resumeDir = state.resumeDir;
+  document.getElementById('startupScreen').classList.add('hidden');
+  document.getElementById('mainLayout').style.display = '';
+  document.getElementById('projectPath').textContent = resumeDir;
+  data = state.resume;
+  config = state.config;
+  currentPdfPath = state.pdfPath || null;
+  renderSections();
+  renderConfig();
+  setPdf(currentPdfPath);
+}
+
+async function chooseProject() {
+  const state = await window.api.selectProject();
+  if (state && state.error) {
+    alert(state.error);
+    return;
+  }
+  applyState(state);
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-sections').style.display = name === 'sections' ? '' : 'none';
+  document.getElementById('tab-layout').style.display = name === 'layout' ? '' : 'none';
+}
+
+function setPdf(pdfPath) {
+  const frame = document.getElementById('pdfFrame');
+  const placeholder = document.getElementById('placeholder');
+  if (pdfPath) {
+    frame.src = `file://${encodeURI(pdfPath)}?t=${Date.now()}`;
+    frame.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    frame.style.display = 'none';
+    placeholder.style.display = 'flex';
+  }
+}
+
+function renderSections() {
+  if (!data) return;
+  const app = document.getElementById('tab-sections');
+  app.innerHTML = data.sections.map((sec, si) => `
+    <div class="section">
+      <div class="section-header">
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" ${sec.enabled ? 'checked' : ''} onchange="toggleSection(${si}, this.checked)">
+          <span class="slider"></span>
+        </label>
+        <h2>${sec.name.replace('.tex','')}</h2>
+      </div>
+      ${sec.items.length ? `<div class="items">${sec.items.map((item, ii) => {
+        const key = si + '-' + ii;
+        const isOpen = !!expanded[key];
+        const hasBullets = item.bullets && item.bullets.length > 0;
+        return `
+        <div class="item">
+          <div class="item-row" onclick="${hasBullets ? `toggleExpand(${si},${ii})` : ''}">
+            <span class="expand-arrow ${isOpen ? 'open' : ''} ${hasBullets ? '' : 'hidden'}">▶</span>
+            <label class="toggle" onclick="event.stopPropagation()">
+              <input type="checkbox" ${item.enabled ? 'checked' : ''} ${!sec.enabled ? 'disabled' : ''} onchange="toggleItem(${si}, ${ii}, this.checked)">
+              <span class="slider"></span>
+            </label>
+            <span class="item-title ${item.enabled && sec.enabled ? '' : 'disabled'}">${esc(item.title)}</span>
+          </div>
+          ${hasBullets ? `<div class="bullet-list ${isOpen ? 'open' : ''}">${item.bullets.map((b, bi) => `
+            <div class="bullet">
+              <label class="toggle-sm" onclick="event.stopPropagation()">
+                <input type="checkbox" ${b.enabled ? 'checked' : ''} ${!item.enabled || !sec.enabled ? 'disabled' : ''} onchange="toggleBullet(${si},${ii},${bi},this.checked)">
+                <span class="slider"></span>
+              </label>
+              <span class="bullet-text ${b.enabled && item.enabled && sec.enabled ? '' : 'disabled'}" contenteditable="${item.enabled && sec.enabled ? 'true' : 'false'}" onblur="editBullet(${si},${ii},${bi},this.textContent)">${esc(b.text)}</span>
+            </div>
+          `).join('')}</div>` : ''}
+        </div>`;
+      }).join('')}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderConfig() {
+  if (!config) return;
+  const el = document.getElementById('tab-layout');
+  el.innerHTML = CONFIG_DEFS.map(grp => `
+    <div class="config-group">
+      <h3>${grp.group}</h3>
+      ${grp.items.map(it => {
+        const val = config[it.key];
+        if (val == null) return '';
+        return `
+        <div class="config-row">
+          <span class="config-label">${it.label}</span>
+          <input type="range" class="config-slider" min="${it.min}" max="${it.max}" step="${it.step}" value="${val}" oninput="updateConfig('${it.key}', this.value, this)">
+          <input type="number" class="config-input" min="${it.min}" max="${it.max}" step="${it.step}" value="${val}" onchange="updateConfig('${it.key}', this.value, this)">
+          <span class="config-value">${it.unit}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function toggleExpand(si, ii) {
+  const key = si + '-' + ii;
+  expanded[key] = !expanded[key];
+  renderSections();
+}
+
+function toggleSection(si, val) { data.sections[si].enabled = val; renderSections(); }
+function toggleItem(si, ii, val) { data.sections[si].items[ii].enabled = val; renderSections(); }
+function toggleBullet(si, ii, bi, val) { data.sections[si].items[ii].bullets[bi].enabled = val; renderSections(); }
+function editBullet(si, ii, bi, text) { data.sections[si].items[ii].bullets[bi].text = text.trim(); }
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function updateConfig(key, val, el) {
+  const v = parseFloat(val);
+  if (isNaN(v)) return;
+  config[key] = v;
+  const row = el.closest('.config-row');
+  row.querySelectorAll('input').forEach(inp => { if (inp !== el) inp.value = v; });
+}
+
+function setButtons(disabled) {
+  document.getElementById('btnSave').disabled = disabled;
+  document.getElementById('btnSaveOnly').disabled = disabled;
+}
+
+async function save() {
+  if (!data || !config) return;
+  const status = document.getElementById('status');
+  status.textContent = 'Saving...'; status.className = 'status';
+  setButtons(true);
+  await window.api.save({ sections: data.sections, config });
+  setButtons(false);
+  status.textContent = '✓ Saved'; status.className = 'status ok';
+}
+
+async function saveAndCompile() {
+  if (!data || !config) return;
+  const status = document.getElementById('status');
+  const previewStatus = document.getElementById('previewStatus');
+  status.textContent = 'Saving...'; status.className = 'status';
+  setButtons(true);
+  const result = await window.api.saveAndCompile({ sections: data.sections, config }).catch(err => ({ error: err.message }));
+  setButtons(false);
+  if (result?.error) {
+    status.textContent = '✗ ' + result.error;
+    status.className = 'status err';
+    previewStatus.textContent = 'error';
+    return;
+  }
+  status.textContent = '✓ Saved & compiled'; status.className = 'status ok';
+  previewStatus.textContent = '';
+  if (result?.pdfPath) {
+    currentPdfPath = result.pdfPath;
+    setPdf(currentPdfPath);
+  }
+}
+
+document.getElementById('btnOpenFolder').addEventListener('click', chooseProject);
+document.getElementById('btnChangeProject').addEventListener('click', showStartup);
+document.getElementById('tabSections').addEventListener('click', function() { switchTab('sections', this); });
+document.getElementById('tabLayout').addEventListener('click', function() { switchTab('layout', this); });
+document.getElementById('btnSave').addEventListener('click', saveAndCompile);
+document.getElementById('btnSaveOnly').addEventListener('click', save);
+
+init();
+</script>
+</body>
+</html>
