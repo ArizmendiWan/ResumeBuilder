@@ -3,6 +3,10 @@ import { button, checkbox, esc, field } from './dom.js';
 export function renderProfile(state) {
   const profile = state.project.profile;
   const links = profile.links || [];
+  const indexedLinks = links.map((link, idx) => ({ link, idx }));
+  const github = indexedLinks.find(entry => entry.link.kind === 'github');
+  const linkedin = indexedLinks.find(entry => entry.link.kind === 'linkedin');
+  const customLinks = indexedLinks.filter(entry => entry.link.kind === 'custom');
   return `
     <div class="editor-section">
       <div class="section-header">
@@ -22,29 +26,67 @@ export function renderProfile(state) {
     <div class="editor-section">
       <div class="section-header">
         <div>
+          <div class="section-label">Social link</div>
+          <h2>GitHub</h2>
+        </div>
+      </div>
+      <div class="inspector-list">
+        ${github ? renderSocialLink(github) : '<div class="list-empty">GitHub settings unavailable.</div>'}
+      </div>
+    </div>
+
+    <div class="editor-section">
+      <div class="section-header">
+        <div>
+          <div class="section-label">Social link</div>
+          <h2>LinkedIn</h2>
+        </div>
+      </div>
+      <div class="inspector-list">
+        ${linkedin ? renderSocialLink(linkedin) : '<div class="list-empty">LinkedIn settings unavailable.</div>'}
+      </div>
+    </div>
+
+    <div class="editor-section">
+      <div class="section-header">
+        <div>
           <div class="section-label">Links</div>
-          <h2>Header links</h2>
+          <h2>Other links</h2>
         </div>
         ${button({ label: 'Add Link', iconName: 'add', className: 'button-sm', onClick: 'addLink()' })}
       </div>
       <div class="inspector-list">
-        ${links.length ? links.map(renderLink).join('') : '<div class="list-empty">No links yet.</div>'}
+        ${customLinks.length ? customLinks.map(renderLink).join('') : '<div class="list-empty">No other links yet.</div>'}
       </div>
     </div>
   `;
 }
 
-function renderLink(link, idx) {
+function renderSocialLink({ link, idx }) {
+  return `<div class="compact-card">
+    <div class="compact-card-header">
+      ${checkbox({ checked: link.enabled, label: 'Show', onChange: `updateLink(${idx}, 'enabled', this.checked)` })}
+      <div class="compact-title">${esc(link.label)}</div>
+    </div>
+    ${renderLinkFields(link, idx)}
+  </div>`;
+}
+
+function renderLink({ link, idx }) {
   return `<div class="compact-card">
     <div class="compact-card-header">
       ${checkbox({ checked: link.enabled, label: 'Show', onChange: `updateLink(${idx}, 'enabled', this.checked)` })}
       <div class="compact-title">${esc(link.label || 'Link')}</div>
       ${button({ iconName: 'delete', className: 'icon-button danger', title: 'Delete link', onClick: `deleteLink(${idx})` })}
     </div>
-    <div class="form-grid">
-      ${field({ label: 'Label', value: link.label, onInput: `updateLink(${idx}, 'label', this.value)` })}
-      ${field({ label: 'URL', type: 'url', value: link.url, onInput: `updateLink(${idx}, 'url', this.value)` })}
-    </div>
+    ${renderLinkFields(link, idx)}
+  </div>`;
+}
+
+function renderLinkFields(link, idx) {
+  return `<div class="form-grid">
+    ${field({ label: 'Display text', value: link.label, onInput: `updateLink(${idx}, 'label', this.value)` })}
+    ${field({ label: 'URL', type: 'url', value: link.url, onInput: `updateLink(${idx}, 'url', this.value)` })}
   </div>`;
 }
 
@@ -60,7 +102,7 @@ window.updateLink = (idx, key, value) => {
 };
 
 window.addLink = () => {
-  window.state.project.profile.links.push({ id: `link-${Date.now()}`, label: 'Link', url: '', enabled: true });
+  window.state.project.profile.links.push({ id: `link-${Date.now()}`, kind: 'custom', label: 'Link', url: '', enabled: true });
   window.markDirty();
   window.rerender();
 };

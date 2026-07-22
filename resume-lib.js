@@ -31,9 +31,9 @@ function defaultProject() {
       email: 'you@example.com',
       phone: '',
       links: [
-        { id: 'link-github', label: 'GitHub', url: 'https://github.com/yourname', enabled: true },
-        { id: 'link-linkedin', label: 'LinkedIn', url: '', enabled: false },
-        { id: 'link-portfolio', label: 'Portfolio', url: '', enabled: false },
+        { id: 'link-github', kind: 'github', label: 'GitHub', url: 'https://github.com/yourname', enabled: true },
+        { id: 'link-linkedin', kind: 'linkedin', label: 'LinkedIn', url: '', enabled: false },
+        { id: 'link-portfolio', kind: 'custom', label: 'Portfolio', url: '', enabled: false },
       ],
     },
     sections: [
@@ -124,6 +124,42 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function inferProfileLinkKind(link) {
+  const explicitKind = String(link?.kind || '').toLowerCase();
+  if (['github', 'linkedin', 'custom'].includes(explicitKind)) return explicitKind;
+  const identity = `${link?.id || ''} ${link?.label || ''} ${link?.url || ''}`;
+  if (/github/i.test(identity)) return 'github';
+  if (/linkedin/i.test(identity)) return 'linkedin';
+  return 'custom';
+}
+
+function normalizeProfileLinks(links) {
+  const normalized = ensureArray(links).map((link, idx) => {
+    const kind = inferProfileLinkKind(link);
+    const defaultLabel = kind === 'github' ? 'GitHub' : kind === 'linkedin' ? 'LinkedIn' : 'Link';
+    return {
+      id: link.id || newId(`link-${idx}`),
+      kind,
+      label: link.label || defaultLabel,
+      url: link.url || '',
+      icon: link.icon || '',
+      enabled: link.enabled !== false,
+    };
+  });
+
+  const github = normalized.find(link => link.kind === 'github') || {
+    id: 'link-github', kind: 'github', label: 'GitHub', url: '', icon: '', enabled: false,
+  };
+  const linkedin = normalized.find(link => link.kind === 'linkedin') || {
+    id: 'link-linkedin', kind: 'linkedin', label: 'LinkedIn', url: '', icon: '', enabled: false,
+  };
+  const dedicated = new Set([github, linkedin]);
+  const custom = normalized
+    .filter(link => !dedicated.has(link))
+    .map(link => ({ ...link, kind: 'custom' }));
+  return [github, linkedin, ...custom];
+}
+
 function normalizeProject(project) {
   const base = defaultProject();
   const merged = {
@@ -132,13 +168,7 @@ function normalizeProject(project) {
     profile: { ...base.profile, ...(project.profile || {}) },
     layout: { ...base.layout, ...(project.layout || {}) },
   };
-  merged.profile.links = ensureArray(merged.profile.links).map((link, idx) => ({
-    id: link.id || newId(`link-${idx}`),
-    label: link.label || 'Link',
-    url: link.url || '',
-    icon: link.icon || '',
-    enabled: link.enabled !== false,
-  }));
+  merged.profile.links = normalizeProfileLinks(merged.profile.links);
   merged.sections = ensureArray(merged.sections).length ? merged.sections : base.sections;
   merged.education = ensureArray(merged.education).map((item, idx) => ({
     id: item.id || newId(`edu-${idx}`),
@@ -452,10 +482,10 @@ ${renderFontMacros(layout)}
     \\end{adjustwidth}
 }
 
-\\newenvironment{twocolentry}[2][]{
+\\newenvironment{twocolentry}[2][3.6 cm]{
     \\onecolentry
     \\def\\secondColumn{#2}
-    \\setcolumnwidth{\\fill, 3.6 cm}
+    \\setcolumnwidth{\\fill, #1}
     \\begin{paracol}{2}
 }{
     \\switchcolumn \\raggedleft {\\ResumeEntryMetaFont \\secondColumn}
@@ -507,7 +537,11 @@ function renderHeader(profile, layout) {
   if (hasText(profile.phone)) parts.push(`\\mbox{Tel: ${latexEscape(profile.phone)}}`);
   for (const link of ensureArray(profile.links).filter(link => link.enabled && hasText(link.url))) {
     const label = hasText(link.label) ? link.label : link.url;
-    const icon = link.icon || (/github/i.test(`${label} ${link.url}`) ? '\\faGithub \\  ' : '');
+    const kind = inferProfileLinkKind(link);
+    const socialIcon = kind === 'github' ? '\\faGithub \\  '
+      : kind === 'linkedin' ? '\\faLinkedin \\  '
+        : '';
+    const icon = link.icon || socialIcon;
     parts.push(`\\mbox{${icon}\\hrefWithoutArrow{${latexUrl(link.url)}}{${latexEscape(label)}}}`);
   }
 
@@ -599,7 +633,7 @@ function renderPublicationItem(item, idx = 0) {
   const topSpace = idx === 0 ? '0.10' : '0.20';
   const linkLine = hasText(item.linkUrl) || hasText(item.venue)
     ? `\\vspace{0.10 cm}
-\\begin{twocolentry}
+\\begin{twocolentry}[4.1 cm]
 {${renderPublicationLink(item)}}
 {\\ResumeEntryMetaFont ${latexEscape(item.venue)}}
 \\end{twocolentry}

@@ -102,6 +102,25 @@ test('creates and reads a JSON project round trip', () => {
   assert.equal(fs.existsSync(path.join(dir, 'resume.json')), true);
 });
 
+test('normalizes dedicated GitHub and LinkedIn profile links while preserving custom links', () => {
+  const project = sampleProject();
+  project.profile.links = [
+    { id: 'legacy-github', label: 'Ada', url: 'https://github.com/ada_l', enabled: true },
+    { id: 'portfolio', label: 'Portfolio', url: 'https://ada.example.com', enabled: true },
+  ];
+
+  const normalized = resumeLib.normalizeProject(project);
+
+  assert.deepEqual(
+    normalized.profile.links.map(link => ({ kind: link.kind, label: link.label, enabled: link.enabled })),
+    [
+      { kind: 'github', label: 'Ada', enabled: true },
+      { kind: 'linkedin', label: 'LinkedIn', enabled: false },
+      { kind: 'custom', label: 'Portfolio', enabled: true },
+    ],
+  );
+});
+
 test('escapes LaTeX special characters', () => {
   assert.equal(
     resumeLib.latexEscape('A&B_50%#{x}$'),
@@ -129,6 +148,20 @@ test('renders supported resume sections and omits disabled content', () => {
   assert.doesNotMatch(files['sec/experience.tex'], /Hidden bullet/);
 });
 
+test('renders dedicated GitHub and LinkedIn symbols in the contact line', () => {
+  const project = sampleProject();
+  project.profile.links = [
+    { id: 'github', kind: 'github', label: 'ada_l', url: 'https://github.com/ada_l', enabled: true },
+    { id: 'linkedin', kind: 'linkedin', label: 'ada-lovelace', url: 'https://linkedin.com/in/ada-lovelace', enabled: true },
+  ];
+
+  const files = resumeLib.renderProjectFiles(project);
+
+  assert.match(files['header.tex'], /\\faGithub/);
+  assert.match(files['header.tex'], /\\faLinkedin/);
+  assert.match(files['header.tex'], /linkedin\.com\/in\/ada-lovelace/);
+});
+
 test('applies layout values to generated LaTeX files', () => {
   const project = sampleProject();
   project.layout.pageBreakBeforeProjects = true;
@@ -153,6 +186,18 @@ test('applies layout values to generated LaTeX files', () => {
   assert.match(files['sec/experience.tex'], /\\ResumeEntryMetaFont Analytical Engine -- London/);
   assert.match(files['sec/experience.tex'], /\\item \{\\ResumeBulletFont Wrote an algorithm/);
   assert.match(files['main.tex'], /\\clearpage\n\s*\\input\{sec\/projects\}/);
+});
+
+test('widens only publication link columns', () => {
+  const files = resumeLib.renderProjectFiles(sampleProject());
+
+  assert.match(
+    files['preamble.tex'],
+    /\\newenvironment\{twocolentry\}\[2\]\[3\.6 cm\]/,
+  );
+  assert.match(files['preamble.tex'], /\\setcolumnwidth\{\\fill, #1\}/);
+  assert.match(files['sec/publications.tex'], /\\begin\{twocolentry\}\[4\.1 cm\]/);
+  assert.doesNotMatch(files['sec/experience.tex'], /\[4\.1 cm\]/);
 });
 
 test('writes generated LaTeX into the project build directory', () => {
