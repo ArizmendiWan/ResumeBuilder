@@ -1,0 +1,4 @@
+interface:
+  display_name: "Resume Picker"
+  short_description: "Edit and compile Resume Picker projects"
+  default_prompt: "Use $resume-picker to update my resume and verify the compiled PDF."
