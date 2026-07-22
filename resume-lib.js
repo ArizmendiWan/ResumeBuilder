@@ -8,6 +8,10 @@ const LATEX_ENGINE_CANDIDATES = [
   '/Library/TeX/texbin/pdflatex',
   'pdflatex',
 ];
+const XELATEX_ENGINE_CANDIDATES = [
+  '/Library/TeX/texbin/xelatex',
+  'xelatex',
+];
 
 function joinProject(dir, ...parts) {
   return path.join(dir, ...parts);
@@ -108,6 +112,7 @@ function defaultLayout() {
     bulletFontSize: 10,
     skillFontSize: 10,
     headerSepKern: 5,
+    pageBreakBeforeProjects: false,
   };
 }
 
@@ -298,9 +303,10 @@ function renderLatex(projectDir, project = readProject(projectDir)) {
 }
 
 function renderProjectFiles(project) {
+  const useCjk = hasCjkText(project);
   const files = {
-    'main.tex': renderMain(project),
-    'preamble.tex': renderPreamble(project.layout),
+    'main.tex': renderMain(project, useCjk),
+    'preamble.tex': renderPreamble(project.layout, useCjk),
     'header.tex': renderHeader(project.profile, project.layout),
   };
   for (const section of project.sections) {
@@ -314,12 +320,17 @@ function renderProjectFiles(project) {
   return files;
 }
 
-function renderMain(project) {
+function renderMain(project, useCjk = false) {
   const layout = project.layout;
   const title = project.profile.name ? `${project.profile.name}'s Resume` : 'Resume';
   const sectionInputs = project.sections
     .filter(section => section.enabled)
-    .map(section => `    \\input{sec/${sectionFileName(section.id)}}`)
+    .map(section => {
+      const pageBreak = layout.pageBreakBeforeProjects && section.id === 'projects'
+        ? '    \\clearpage\n'
+        : '';
+      return `${pageBreak}    \\input{sec/${sectionFileName(section.id)}}`;
+    })
     .join('\n    \\vspace{0.10 cm}\n');
 
   return `\\documentclass[10pt, letterpaper]{article}
@@ -340,7 +351,7 @@ function renderMain(project) {
 \\definecolor{primaryColor}{RGB}{0, 0, 0}
 \\usepackage{enumitem}
 \\usepackage{fontawesome5}
-\\usepackage{fontawesome}
+${useCjk ? '' : '\\usepackage{fontawesome}'}
 \\usepackage{amsmath}
 \\usepackage[
     pdftitle={${latexEscape(title)}},
@@ -375,8 +386,14 @@ ${sectionInputs}
 `;
 }
 
-function renderPreamble(layout) {
-  return `% Ensure that generated PDF is machine readable/ATS parsable:
+function renderPreamble(layout, useCjk = false) {
+  const fontSetup = useCjk
+    ? `% Configure Unicode and Simplified Chinese fonts for XeLaTeX:
+\\usepackage{fontspec}
+\\usepackage{xeCJK}
+\\setmainfont{Charter}
+\\setCJKmainfont[BoldFont=FandolSong-Bold.otf]{FandolSong-Regular.otf}`
+    : `% Ensure that generated PDF is machine readable/ATS parsable:
 \\ifPDFTeX
     \\input{glyphtounicode}
     \\pdfgentounicode=1
@@ -385,7 +402,9 @@ function renderPreamble(layout) {
     \\usepackage{lmodern}
 \\fi
 
-\\usepackage{charter}
+\\usepackage{charter}`;
+
+  return `${fontSetup}
 
 % Some settings:
 \\raggedright
@@ -665,10 +684,18 @@ function sectionFileName(sectionId) {
   return sectionId;
 }
 
+function hasCjkText(project) {
+  return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u.test(JSON.stringify(project));
+}
+
+function latexEngineCandidates(project) {
+  return hasCjkText(project) ? XELATEX_ENGINE_CANDIDATES : LATEX_ENGINE_CANDIDATES;
+}
+
 function compileProject(projectDir, project = readProject(projectDir)) {
   renderLatex(projectDir, project);
   const buildDir = getBuildDir(projectDir);
-  const engine = findLatexEngine();
+  const engine = findLatexEngine(project);
   try {
     execFileSync(engine, ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], {
       cwd: buildDir,
@@ -687,8 +714,9 @@ function compileProject(projectDir, project = readProject(projectDir)) {
   }
 }
 
-function findLatexEngine() {
-  for (const candidate of LATEX_ENGINE_CANDIDATES) {
+function findLatexEngine(project) {
+  const candidates = latexEngineCandidates(project);
+  for (const candidate of candidates) {
     try {
       execFileSync(candidate, ['--version'], { timeout: 5000, stdio: 'ignore' });
       return candidate;
@@ -696,7 +724,8 @@ function findLatexEngine() {
       // Try the next candidate.
     }
   }
-  throw new Error('Could not find pdflatex. Install MacTeX or TeX Live and make pdflatex available on PATH.');
+  const engineName = hasCjkText(project) ? 'xelatex' : 'pdflatex';
+  throw new Error(`Could not find ${engineName}. Install MacTeX or TeX Live and make ${engineName} available on PATH.`);
 }
 
 function readCompileLog(buildDir) {
@@ -729,4 +758,5 @@ module.exports = {
   getBuildDir,
   getPdfPath,
   latexEscape,
+  latexEngineCandidates,
 };

@@ -1,5 +1,6 @@
-/.DS_Store
+*.DS_Store
 /Resume Picker-darwin-arm64
 /Resume Picker-darwin-arm64.zip
 node_modules/
 docs/
+projects/

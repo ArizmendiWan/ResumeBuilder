@@ -130,7 +130,9 @@ test('renders supported resume sections and omits disabled content', () => {
 });
 
 test('applies layout values to generated LaTeX files', () => {
-  const files = resumeLib.renderProjectFiles(sampleProject());
+  const project = sampleProject();
+  project.layout.pageBreakBeforeProjects = true;
+  const files = resumeLib.renderProjectFiles(project);
 
   assert.match(files['main.tex'], /top=1.4 cm/);
   assert.match(files['main.tex'], /left=0.8 cm/);
@@ -150,6 +152,7 @@ test('applies layout values to generated LaTeX files', () => {
   assert.match(files['sec/experience.tex'], /\\ResumeEntryTitleFont\\textbf\{Programmer\}/);
   assert.match(files['sec/experience.tex'], /\\ResumeEntryMetaFont Analytical Engine -- London/);
   assert.match(files['sec/experience.tex'], /\\item \{\\ResumeBulletFont Wrote an algorithm/);
+  assert.match(files['main.tex'], /\\clearpage\n\s*\\input\{sec\/projects\}/);
 });
 
 test('writes generated LaTeX into the project build directory', () => {
@@ -161,4 +164,31 @@ test('writes generated LaTeX into the project build directory', () => {
   assert.equal(fs.existsSync(path.join(dir, 'build', 'header.tex')), true);
   assert.equal(fs.existsSync(path.join(dir, 'build', 'sec', 'projects.tex')), true);
   assert.equal(fs.existsSync(path.join(dir, 'build', 'sec', 'publications.tex')), true);
+});
+
+test('configures Chinese projects for XeLaTeX with a CJK font', () => {
+  const project = sampleProject();
+  project.profile.name = '陈怡然';
+
+  const files = resumeLib.renderProjectFiles(project);
+  const candidates = resumeLib.latexEngineCandidates(project);
+
+  assert.match(files['preamble.tex'], /\\usepackage\{xeCJK\}/);
+  assert.match(
+    files['preamble.tex'],
+    /\\setCJKmainfont\[BoldFont=FandolSong-Bold\.otf\]\{FandolSong-Regular\.otf\}/,
+  );
+  assert.match(files['main.tex'], /\\usepackage\{fontawesome5\}/);
+  assert.doesNotMatch(files['main.tex'], /\\usepackage\{fontawesome\}\n/);
+  assert.equal(path.basename(candidates[0]), 'xelatex');
+});
+
+test('keeps PDFLaTeX configuration for projects without Chinese text', () => {
+  const project = sampleProject();
+  const files = resumeLib.renderProjectFiles(project);
+  const candidates = resumeLib.latexEngineCandidates(project);
+
+  assert.doesNotMatch(files['preamble.tex'], /\\usepackage\{xeCJK\}/);
+  assert.match(files['main.tex'], /\\usepackage\{fontawesome\}\n/);
+  assert.equal(path.basename(candidates[0]), 'pdflatex');
 });
