@@ -1,59 +1,71 @@
-# Resume Picker
+# Resume Builder
 
-A macOS desktop app for editing LaTeX resumes. Pick a resume project folder, toggle sections and bullet points on or off, edit text inline, tweak layout (margins, spacing, font sizes), and compile to PDF—all without touching LaTeX by hand.
+A macOS Electron app for building structured resumes and rendering them with a LaTeX engine. Resume content is stored in `resume.json`; LaTeX files and PDFs are generated artifacts.
 
 ## Features
 
-- **Choose resume folder** — Start by picking your LaTeX resume directory; recent folders are remembered.
-- **Sections** — Enable or disable whole sections (e.g. Education, Experience).
-- **Items & bullets** — Toggle individual entries and bullet points; edit bullet text in the app.
-- **Layout** — Adjust page margins, section spacing, bullet spacing, and header font size via sliders.
-- **Compile** — Save and compile to PDF with one click; preview in the app.
+- Create and open resume builder projects.
+- Edit profile, links, education, experience, projects, skills, section labels, and section order.
+- Toggle sections, entries, links, and bullets on or off.
+- Adjust page margins, section spacing, bullet spacing, and header sizing.
+- Generate LaTeX into a project-local `build/` folder.
+- Compile with local `pdflatex` and preview the generated PDF.
+- Export the compiled PDF.
 
 ## Requirements
 
-- **Node.js** (v18+)
-- **macOS** (Apple Silicon; the packaged app is `darwin-arm64`)
-- **MacTeX** (or TeX Live with `pdflatex` at `/Library/TeX/texbin/pdflatex`) for PDF compilation
+- Node.js 18+
+- macOS
+- MacTeX or TeX Live with `pdflatex` available at `/Library/TeX/texbin/pdflatex` or on `PATH`
 
-## LaTeX project layout
+## Project Format
 
-Your resume folder must look like this:
+Each resume project is a folder with this canonical file:
 
-- `main.tex` — main document (includes `sec/*.tex`)
-- `preamble.tex` — preamble and layout settings
-- `header.tex` — name/header
-- `sec/` — directory of section files (e.g. `sec/education.tex`, `sec/experience.tex`)
+```text
+resume.json
+```
 
-Section files use `\input{...}` for each item; items use `\item` for bullets. The app comments/uncomments these in the `.tex` files and parses/writes the structure accordingly.
+Generated files are written to:
 
-## Install & run
+```text
+build/
+  main.tex
+  preamble.tex
+  header.tex
+  sec/
+    education.tex
+    skills.tex
+    experience.tex
+    projects.tex
+  main.pdf
+```
+
+Do not edit generated files as the source of truth. Edit the project in the app or update `resume.json`.
+
+## Template
+
+V1 ships one app-owned template, `rendercv-classic`, defined in `templates/rendercv-classic/`. It is based on the RenderCV-style LaTeX resume layout used by the original scratch project, but it does not hardcode personal resume content.
+
+## Install And Run
 
 ```bash
 npm install
 npm start
 ```
 
-## Package macOS app
+## Tests
+
+```bash
+npm test
+```
+
+The tests cover project JSON round trips, LaTeX escaping, section rendering, disabled content omission, layout interpolation, and generated file output.
+
+## Package macOS App
 
 ```bash
 npm run package
 ```
 
-Produces **Resume Picker.app** in `Resume Picker-darwin-arm64/` (and a zip in the project root). Uses `icon.icns` for the app icon.
-
-## Project layout
-
-| File / folder      | Purpose |
-|--------------------|--------|
-| `main.js`          | Electron main process, window, IPC, folder picker |
-| `preload.js`       | Exposes `window.api` for renderer (IPC bridge) |
-| `index.html`       | UI: startup screen, sections/layout tabs, PDF preview |
-| `resume-lib.js`    | Parse/write LaTeX, read config, run `pdflatex` |
-| `icon.png` / `icon.icns` | App icon |
-
-Settings (last resume folder, recent folders) are stored in `~/Library/Application Support/picker/settings.json`.
-
-## License
-
-ISC
+The package script currently builds an Apple Silicon macOS app with the existing app icon.

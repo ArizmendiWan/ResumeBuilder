@@ -1,0 +1,16 @@
+{
+  "id": "rendercv-classic",
+  "name": "RenderCV Classic",
+  "description": "ATS-friendly one-column resume template derived from the local RenderCV-style LaTeX resume layout.",
+  "engine": "pdflatex",
+  "generatedFiles": [
+    "main.tex",
+    "preamble.tex",
+    "header.tex",
+    "sec/education.tex",
+    "sec/skills.tex",
+    "sec/publications.tex",
+    "sec/experience.tex",
+    "sec/projects.tex"
+  ]
+}

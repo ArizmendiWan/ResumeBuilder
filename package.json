@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
     "package": "npx @electron/packager . \"Resume Picker\" --platform=darwin --arch=arm64 --icon=icon.icns --overwrite"
   },
   "keywords": [],
